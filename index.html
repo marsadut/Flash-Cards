@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Cards App</title>
+    <style>
+        /* --- 1. CSS & Layouting --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        /* --- Progress Bar --- */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .progress-bar-outline {
+            flex-grow: 1; /* Mengisi sisa ruang */
+            height: 15px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden; /* Penting untuk border-radius */
+            border: 1px solid #ccc;
+        }
+
+        .progress-bar-fill {
+            width: 0%; /* Di-update oleh JavaScript */
+            height: 100%;
+            background-color: #888;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            color: #555;
+            font-weight: 500;
+            white-space: nowrap; /* Mencegah teks turun baris */
+        }
+
+        /* --- Flash Card (Efek Flip) --- */
+        /* Kontainer untuk 3D */
+        .flashcard {
+            background-color: transparent;
+            width: 100%;
+            height: 300px;
+            perspective: 1000px; /* Diperlukan untuk 3D flip */
+            margin-bottom: 10px;
+        }
+
+        /* Kontainer yang akan berputar */
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        /* Bagian Depan & Belakang */
+        .flashcard-front,
+        .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden; /* Safari */
+            backface-visibility: hidden;
+            
+            /* Styling Kartu */
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            
+            /* Menengahkan teks di dalam kartu */
+            display: grid;
+            place-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .card-text {
+            font-size: 1.5em;
+            font-weight: 500;
+            margin: 0;
+            line-height: 1.4;
+        }
+        
+        /* Bagian Belakang (sudah terbalik 180 derajat) */
+        .flashcard-back {
+            transform: rotateY(180deg);
+            font-size: 1.1em;
+        }
+
+        /* Kelas ini ditambahkan oleh JS untuk memutar kartu */
+        .flashcard-inner.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        /* --- Navigasi --- */
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            padding: 10px 20px;
+        }
+        
+        .nav-button {
+            background: none;
+            border: none;
+            font-size: 1em;
+            font-weight: 500;
+            color: #333;
+            cursor: pointer;
+            padding: 10px;
+        }
+        
+        .nav-button:hover:not(:disabled) {
+            color: #000;
+        }
+        
+        .nav-button:disabled {
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        
+        #flip-btn {
+            color: #007bff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- --- 2. HTML --- -->
+    <main class="app-container">
+        <h1>Flash Cards</h1>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-bar-outline">
+                <div id="progress-bar" class="progress-bar-fill"></div>
+            </div>
+            <span id="progress-text" class="progress-text">0 / 0</span>
+        </div>
+
+        <!-- Flash Card -->
+        <div class="flashcard" id="flashcard">
+            <div class="flashcard-inner" id="flashcard-inner">
+                <div class="flashcard-front">
+                    <p id="question-text" class="card-text">Loading...</p>
+                </div>
+                <div class="flashcard-back">
+                    <p id="answer-text" class="card-text">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigasi -->
+        <div class="navigation">
+            <button id="prev-btn" class="nav-button">&lt; Previous</button>
+            <button id="flip-btn" class="nav-button">Show Answer</button>
+            <button id="next-btn" class="nav-button">Next &gt;</button>
+        </div>
+    </main>
+
+    <!-- --- 3. JavaScript --- -->
+    <script>
+        // --- 1. Data Flash Cards (Pre-defined) ---
+        const flashcards = [
+            {
+                question: "What is the difference between var, let, and const?",
+                answer: "In JavaScript, var is function-scoped and can be re-declared; let and const are block-scoped, with let allowing re-assignment and const preventing it."
+            },
+            {
+                question: "What is hoisting in JavaScript?",
+                answer: "Hoisting is JavaScript's default behavior of moving declarations to the top of the current scope (script or function)."
+            },
+            {
+                question: "What is a 'closure'?",
+                answer: "A closure is a function that has access to its outer function's scope even after the outer function has returned."
+            },
+            {
+                question: "What is the 'this' keyword?",
+                answer: "'this' refers to the object it belongs to. Its value depends on how a function is called (e.g., in a method, it refers to the owner object)."
+            },
+            {
+                question: "What is the difference between == and ===?",
+                answer: "== (Loose Equality) performs type coercion (converts types) before comparing. === (Strict Equality) checks for both value and type without coercion."
+            }
+        ];
+
+        // --- 2. Variabel State (Status) ---
+        let currentCardIndex = 0;
+        let isFlipped = false;
+        const totalCards = flashcards.length;
+
+        // --- 3. Dapatkan Elemen DOM ---
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        
+        const cardInner = document.getElementById('flashcard-inner');
+        const questionText = document.getElementById('question-text');
+        const answerText = document.getElementById('answer-text');
+        
+        const prevBtn = document.getElementById('prev-btn');
+        const flipBtn = document.getElementById('flip-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        // --- 4. Fungsi-fungsi ---
+
+        // Fungsi untuk update konten kartu dan UI
+        function updateCard() {
+            // Dapatkan data kartu saat ini
+            const card = flashcards[currentCardIndex];
+            
+            // Set teks pertanyaan dan jawaban
+            questionText.textContent = card.question;
+            answerText.textContent = card.answer;
+            
+            // Update Progress Bar
+            const progressPercent = ((currentCardIndex + 1) / totalCards) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+            
+            // Update Teks Progress
+            progressText.textContent = `${currentCardIndex + 1} of ${totalCards}`;
+            
+            // Cek status tombol (disabled/enabled)
+            prevBtn.disabled = (currentCardIndex === 0);
+            nextBtn.disabled = (currentCardIndex === totalCards - 1);
+            
+            // Reset kartu ke posisi belum ter-flip
+            if (isFlipped) {
+                flipCard(); // Panggil flipCard untuk reset
+            }
+        }
+
+        // Fungsi untuk membalik kartu
+        function flipCard() {
+            isFlipped = !isFlipped; // Balik status (true/false)
+            cardInner.classList.toggle('is-flipped');
+            flipBtn.textContent = isFlipped ? 'Hide Answer' : 'Show Answer';
+        }
+
+        // Fungsi untuk ke kartu berikutnya
+        function showNextCard() {
+            if (currentCardIndex < totalCards - 1) {
+                currentCardIndex++;
+                updateCard();
+            }
+        }
+
+        // Fungsi untuk ke kartu sebelumnya
+        function showPrevCard() {
+            if (currentCardIndex > 0) {
+                currentCardIndex--;
+                updateCard();
+            }
+        }
+
+        // --- 5. Inisialisasi ---
+        // Tambahkan Event Listeners ke tombol
+        prevBtn.addEventListener('click', showPrevCard);
+        nextBtn.addEventListener('click', showNextCard);
+        flipBtn.addEventListener('click', flipCard);
+        
+        // Muat kartu pertama saat halaman dibuka
+        updateCard();
+
+    </script>
+
+</body>
+</html>
